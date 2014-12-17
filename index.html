@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="B3-plugin-ipban : Enforce B3 bans by IP address">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>B3-plugin-ipban</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/markweirath/b3-plugin-ipban">View on GitHub</a>
+
+          <h1 id="project_title">B3-plugin-ipban</h1>
+          <h2 id="project_tagline">Enforce B3 bans by IP address</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/markweirath/b3-plugin-ipban/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/markweirath/b3-plugin-ipban/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>This plugin checks the  IP addresses of clients with an active ban or tempban. So in addition to the GUID check, it also
+checks the IP address belonging to the client with the active (temp)ban and kicks if appropriate.</p>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<ol>
+<li>copy the contents of the extplugins folder into your installations b3/extplugins folder.</li>
+<li>
+<p>add the plugin to your b3.xml config file:</p>
+
+<pre><code>&lt;plugin name="ipban" config="@b3/extplugins/conf/ipban.ini"/&gt;
+</code></pre>
+</li>
+<li><p>modify the config file to your preference</p></li>
+<li>restart the bot</li>
+</ol>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">B3-plugin-ipban maintained by <a href="https://github.com/markweirath">markweirath</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
