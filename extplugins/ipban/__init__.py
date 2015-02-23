@@ -26,6 +26,7 @@
 # * Correctly return list of banned ips in getBanIps and getTempBanIps
 # * Optimized SQL quieries and IP ban check workflow
 # * Updated plugin module structure for easier install
+# * Fixed usage of deprecated method startup()
 
 __version__ = '1.1.0beta'
 __author__ = 'xlr8or'
@@ -61,7 +62,7 @@ class IpbanPlugin(b3.plugin.Plugin):
         self.query = None                 # shortcut to the storage.query function
         b3.plugin.Plugin.__init__(self, console, config)
 
-    def startup(self):
+    def onStartup(self):
         """
         Initialize plugin settings
         """
