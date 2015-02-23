@@ -26,15 +26,22 @@ __author__ = 'xlr8or'
 
 import b3
 import b3.events
+import b3.lib
 import b3.plugin
 
-# --------------------------------------------------------------------------------------------------
+try:
+    # python 2.7
+    from ConfigParser import NoOptionError
+except ImportError:
+    # python 2.6
+    from b3.lib.configparser import NoOptionError
+
+
 class IpbanPlugin(b3.plugin.Plugin):
+
     requiresConfigFile = True
     _adminPlugin = None
     _frostBiteGameNames = ['bfbc2', 'moh', 'bf3', 'bf4']
-
-
 
     def __init__(self, console, config=None):
         """
@@ -43,14 +50,14 @@ class IpbanPlugin(b3.plugin.Plugin):
         :param config: The plugin configuration
         """
         self._adminPlugin = None          # admin plugin object reference
+        self._maxLevel = 1                # initialize default max level
         self.query = None                 # shortcut to the storage.query function
         b3.plugin.Plugin.__init__(self, console, config)
 
     def startup(self):
-        """\
+        """
         Initialize plugin settings
         """
-
         # get the admin plugin so we can register commands
         self._adminPlugin = self.console.getPlugin('admin')
         if not self._adminPlugin:
@@ -74,9 +81,12 @@ class IpbanPlugin(b3.plugin.Plugin):
         self.debug('Started')
 
     def onLoadConfig(self):
+        """
+        Load plugin configuration
+        """
         try:
-            self._maxLevel = self.config.get('settings', 'maxlevel')
-        except Exception, err:
+            self._maxLevel = self.console.getGroupLevel(self.config.get('settings', 'maxlevel'))
+        except (NoOptionError, KeyError), err:
             self.error(err)
         self.debug('Maximum level affected: %s' % self._maxLevel)
 
