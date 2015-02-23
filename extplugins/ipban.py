@@ -109,26 +109,24 @@ class IpbanPlugin(b3.plugin.Plugin):
         Examine players ip address and allow/deny connection.
         """
         client = event.client
-        self.debug(
-            'Checking player: %s, name: %s, ip: %s, level: %s' % (client.cid, client.name, client.ip, client.maxLevel))
-
         # check the level of the connecting client before applying the filters
         if client.maxLevel > self._maxLevel:
             self.debug('%s is a higher level user, and allowed to connect' % client.name)
-            return True
+            return
+
+        self.debug('Checking player: %s, name: %s, ip: %s' % (client.cid, client.name, client.ip))
+
         # check for active bans and tempbans
-        elif client.ip in self.getBanIps():
+        if client.ip in self.getBanIps():
             self.debug('Client refused: %s - %s' % (client.name, client.ip))
             message = 'Netblocker: Client refused: %s (%s) has an active Ban' % (client.ip, client.name)
             client.kick(message)
-            return False
         elif client.ip in self.getTempBanIps():
             self.debug('Client refused: %s - %s' % (client.name, client.ip))
             message = 'Netblocker: Client refused: %s (%s) has an active TempBan' % (client.ip, client.name)
             client.kick(message)
-            return False
         else:
-            return True
+            self.debug('Client accepted (not active Ban/TempBan found): %s - %s' % (client.name, client.ip))
 
     def getBanIps(self):
         """
