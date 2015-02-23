@@ -16,12 +16,18 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 #
-
-# Changelog:
+# CHANGELOG
+#
 # 06-12-2014 : v1.0.0beta : xlr8or
 # * First edition of ipban
+# 23-02-2015 : v1.1.0beta : Fenix
+# * Added missing 'settings' section in plugin configuration file
+# * Fixed plugin not correctly loading maxlevel property
+# * Correctly return list of banned ips in getBanIps and getTempBanIps
+# * Optimized SQL quieries and IP ban check workflow
+# * Updated plugin module structure for easier install
 
-__version__ = '1.0.0beta'
+__version__ = '1.1.0beta'
 __author__ = 'xlr8or'
 
 import b3
