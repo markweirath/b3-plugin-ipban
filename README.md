@@ -6,7 +6,7 @@ checks the IP address belonging to the client with the active (temp)ban and kick
 
 ## Installation
 
-1. copy the `ipban` folder into your installations `b3/extplugins` folder.
+1. copy the `extplugins/ipban` folder into your installations `b3/extplugins` folder.
 2. load the plugin to your `b3.xml` config file:
 
         <plugin name="ipban" config="@b3/extplugins/ipban/conf/plugin_ipban.ini"/>
