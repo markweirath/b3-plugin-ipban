@@ -9,32 +9,47 @@
 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA    02110-1301    USA
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 #
-
-# Changelog:
+# CHANGELOG
+#
 # 06-12-2014 : v1.0.0beta : xlr8or
 # * First edition of ipban
+# 23-02-2015 : v1.1.0beta : Fenix
+# * Added missing 'settings' section in plugin configuration file
+# * Fixed plugin not correctly loading maxlevel property
+# * Correctly return list of banned ips in getBanIps and getTempBanIps
+# * Optimized SQL quieries and IP ban check workflow
+# * Updated plugin module structure for easier install
+# * Fixed usage of deprecated method startup()
 
-__version__ = '1.0.0beta'
+__version__ = '1.1.0beta'
 __author__ = 'xlr8or'
 
 import b3
 import b3.events
+import b3.lib
 import b3.plugin
 
-# --------------------------------------------------------------------------------------------------
+from time import time
+
+try:
+    # python 2.7
+    from ConfigParser import NoOptionError
+except ImportError:
+    # python 2.6
+    from b3.lib.configparser import NoOptionError
+
+
 class IpbanPlugin(b3.plugin.Plugin):
-    requiresConfigFile = True
+
     _adminPlugin = None
     _frostBiteGameNames = ['bfbc2', 'moh', 'bf3', 'bf4']
-
-
 
     def __init__(self, console, config=None):
         """
@@ -43,14 +58,14 @@ class IpbanPlugin(b3.plugin.Plugin):
         :param config: The plugin configuration
         """
         self._adminPlugin = None          # admin plugin object reference
+        self._maxLevel = 1                # initialize default max level
         self.query = None                 # shortcut to the storage.query function
         b3.plugin.Plugin.__init__(self, console, config)
 
-    def startup(self):
-        """\
+    def onStartup(self):
+        """
         Initialize plugin settings
         """
-
         # get the admin plugin so we can register commands
         self._adminPlugin = self.console.getPlugin('admin')
         if not self._adminPlugin:
@@ -62,88 +77,95 @@ class IpbanPlugin(b3.plugin.Plugin):
         self.query = self.console.storage.query
 
         if self.console.gameName in self._frostBiteGameNames:
-            self.registerEvent(b3.events.EVT_PUNKBUSTER_NEW_CONNECTION)
+            event_id = self.console.getEventID('EVT_PUNKBUSTER_NEW_CONNECTION')
         else:
-            self.registerEvent(b3.events.EVT_CLIENT_AUTH)
+            event_id = self.console.getEventID('EVT_CLIENT_AUTH')
 
-        self.debug('Banned Ips:')
-        self.getBanIps()
-        self.debug('Banned Ips:')
-        self.getTempBanIps()
+        try:
+            # B3 1.10
+            self.registerEvent(event_id, self.onPlayerConnect)
+        except:
+            # B3 1.9.x
+            self.registerEvent(event_id)
 
+        self.debug('Banned Ips: %s' % self.getBanIps())
+        self.debug('Banned Ips: %s' % self.getTempBanIps())
         self.debug('Started')
 
     def onLoadConfig(self):
+        """
+        Load plugin configuration
+        """
         try:
-            self._maxLevel = self.config.get('settings', 'maxlevel')
-        except Exception, err:
+            self._maxLevel = self.console.getGroupLevel(self.config.get('settings', 'maxlevel'))
+        except (NoOptionError, KeyError), err:
             self.error(err)
         self.debug('Maximum level affected: %s' % self._maxLevel)
 
     def onEvent(self, event):
-        """\
+        """
         Handle intercepted events
         """
         # EVT_CLIENT_AUTH is for q3a based games, EVT_PUNKBUSTER_NEW_CONNECTION is a PB related event for BF:BC2
-        if event.type == b3.events.EVT_CLIENT_AUTH or event.type == b3.events.EVT_PUNKBUSTER_NEW_CONNECTION:
-            self.onPlayerConnect(event.client)
+        if event.type == self.console.getEventID('EVT_CLIENT_AUTH') or \
+           event.type == self.console.getEventID('EVT_PUNKBUSTER_NEW_CONNECTION'):
+            self.onPlayerConnect(event)
 
-    def onPlayerConnect(self, client):
-        """\
+    def onPlayerConnect(self, event):
+        """
         Examine players ip address and allow/deny connection.
         """
-        self.debug(
-            'Checking player: %s, name: %s, ip: %s, level: %s' % (client.cid, client.name, client.ip, client.maxLevel))
-
+        client = event.client
         # check the level of the connecting client before applying the filters
         if client.maxLevel > self._maxLevel:
             self.debug('%s is a higher level user, and allowed to connect' % client.name)
-            return True
+            return
+
+        self.debug('Checking player: %s, name: %s, ip: %s' % (client.cid, client.name, client.ip))
+
         # check for active bans and tempbans
-        elif client.ip in self.getBanIps():
+        if client.ip in self.getBanIps():
             self.debug('Client refused: %s - %s' % (client.name, client.ip))
             message = 'Netblocker: Client refused: %s (%s) has an active Ban' % (client.ip, client.name)
             client.kick(message)
-            return False
         elif client.ip in self.getTempBanIps():
             self.debug('Client refused: %s - %s' % (client.name, client.ip))
             message = 'Netblocker: Client refused: %s (%s) has an active TempBan' % (client.ip, client.name)
             client.kick(message)
-            return False
         else:
-            return True
+            self.debug('Client accepted (not active Ban/TempBan found): %s - %s' % (client.name, client.ip))
 
     def getBanIps(self):
-        q = """SELECT penalties.id, penalties.type, penalties.time_add, penalties.time_expire, penalties.reason, penalties.inactive, penalties.duration, penalties.admin_id, target.id as target_id, target.name as target_name, target.ip as target_ip, target.guid FROM penalties, clients as target WHERE penalties.type = 'Ban' AND inactive = 0 AND penalties.client_id = target.id AND ( penalties.time_expire = -1) ORDER BY penalties.id DESC"""
+        """
+        Returns a list of banned IPs
+        """
+        banned = []
+        q = """SELECT clients.ip as target_ip FROM penalties INNER JOIN clients ON penalties.client_id = clients.id
+               WHERE penalties.type = 'Ban' AND penalties.inactive = 0 AND penalties.time_expire = -1
+               GROUP BY clients.ip"""
         cursor = self.query(q)
-        if not cursor:
-            return []
-        _penalties = []
-        while not cursor.EOF:
-            _penalties.append(cursor.getRow())
-            cursor.moveNext()
+        if cursor:
+            while not cursor.EOF:
+                banned.append(cursor.getValue('target_ip'))
+                cursor.moveNext()
         cursor.close()
-
-        _bannedIps = []
-        for _p in _penalties:
-            _bannedIps.append(_p['target_ip'])
-        self.debug(_bannedIps)
+        return banned
 
     def getTempBanIps(self):
-        q = """SELECT penalties.id, penalties.type, penalties.time_add, penalties.time_expire, penalties.reason, penalties.inactive, penalties.duration, penalties.admin_id, target.id AS target_id, target.name AS target_name, target.ip AS target_ip, target.guid FROM penalties INNER JOIN clients target ON penalties.client_id = target.id WHERE penalties.type = 'TempBan' AND penalties.inactive = 0 AND penalties.time_expire >= UNIX_TIMESTAMP(NOW()) + 432000 ORDER BY  penalties.id DESC"""
+        """
+        Returns a list of TempBanned IPs
+        """
+        banned = []
+        q = """SELECT clients.ip AS target_ip FROM penalties INNER JOIN clients ON penalties.client_id = clients.id
+               WHERE penalties.type = 'TempBan' AND penalties.inactive = 0 AND penalties.time_expire > %s
+               GROUP BY clients.ip""" % int(time())
         cursor = self.query(q)
-        if not cursor:
-            return []
-        _penalties = []
-        while not cursor.EOF:
-            _penalties.append(cursor.getRow())
-            cursor.moveNext()
+        if cursor:
+            while not cursor.EOF:
+                banned.append(cursor.getValue('target_ip'))
+                cursor.moveNext()
         cursor.close()
-
-        _bannedIps = []
-        for _p in _penalties:
-            _bannedIps.append(_p['target_ip'])
-        self.debug(_bannedIps)
+        return banned
 
 if __name__ == '__main__':
     print '\nThis is version ' + __version__ + ' by ' + __author__ + ' for BigBrotherBot.\n'
